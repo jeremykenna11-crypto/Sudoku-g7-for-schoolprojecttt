@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Sudoku</title>
+<style>
+:root{--bg:#e9eef4;--card:#f8fafc;--ink:#18253a;--mut:#5d6b80;--line:#a9b7c8;--box:#18253a;--given:#dde5ef;--acc:#2b45d6;--sel:#c9d6ff;--peer:#e3e9f6;--bad:#d23b57;--badbg:#fbdce2;--ok:#1f7a4d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1520;--card:#162131;--ink:#e6edf6;--mut:#93a3ba;--line:#33445c;--box:#9fb2cc;--given:#1f2d42;--acc:#9bb0ff;--sel:#2c3f78;--peer:#1c2a40;--bad:#ff7b92;--badbg:#4a2230;--ok:#6fd49c}}
+:root[data-theme="dark"]{--bg:#0e1520;--card:#162131;--ink:#e6edf6;--mut:#93a3ba;--line:#33445c;--box:#9fb2cc;--given:#1f2d42;--acc:#9bb0ff;--sel:#2c3f78;--peer:#1c2a40;--bad:#ff7b92;--badbg:#4a2230;--ok:#6fd49c}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+h1{margin:0 auto 0 0;font:700 30px/1 "Iowan Old Style","Palatino Linotype",Georgia,serif;letter-spacing:-.01em;user-select:none}
+select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.primary{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
+#time{font:600 18px ui-monospace,Menlo,Consolas,monospace;min-width:4.5ch;text-align:right}
+#board{display:grid;grid-template-columns:repeat(9,1fr);width:100%;aspect-ratio:1;border:3px solid var(--box);border-radius:4px;background:var(--card);overflow:hidden}
+.cell{border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;padding:0;min-width:0;background:transparent;font:500 clamp(18px,6.4vw,32px) "Iowan Old Style","Palatino Linotype",Georgia,serif;color:var(--acc);display:flex;align-items:center;justify-content:center}
+.cell:nth-child(9n+3),.cell:nth-child(9n+6){border-right:2px solid var(--box)}
+.cell:nth-child(n+19):nth-child(-n+27),.cell:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid var(--box)}
+.cell:nth-child(9n){border-right:0}
+.cell:nth-child(n+73){border-bottom:0}
+.cell.g{color:var(--ink);font-weight:700;background:var(--given)}
+.cell.peer{background:var(--peer)}
+.cell.same{background:var(--sel)}
+.cell.sel{background:var(--sel);box-shadow:inset 0 0 0 3px var(--acc)}
+.cell.hint{box-shadow:inset 0 0 0 3px var(--ok)}
+.cell.bad{background:var(--badbg);color:var(--bad)}
+#pad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0 8px}
+#pad button{padding:10px 0;font-size:20px;font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif}
+.acts{display:flex;gap:8px}.acts button{flex:1}
+#msg{min-height:4.2em;margin:12px 0 0;color:var(--mut)}
+#msg.ok{color:var(--ok)}#msg.err{color:var(--bad)}
+dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(94vw,600px);max-height:88vh;padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog h2{margin:0 0 6px;font:700 22px "Iowan Old Style",Georgia,serif}
+dialog input{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
+.kv div{background:var(--bg);border-radius:8px;padding:8px 10px}.kv b{display:block;font-size:20px}.kv span{font-size:13px;color:var(--mut)}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 12px}th,td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+textarea{width:100%;font:12px ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="logo">Sudoku</h1>
+    <select id="lv" aria-label="Difficulty"></select>
+    <button id="new" class="primary">New game</button>
+    <span id="time" aria-live="off">0:00</span>
+  </header>
+  <div id="board" role="grid" aria-label="Sudoku board"></div>
+  <div id="pad"></div>
+  <div class="acts"><button id="hint">Hint</button><button id="check">Check</button><button id="giveup">Give up</button></div>
+  <p id="msg" aria-live="polite"></p>
+  <p id="share-note" class="mut" hidden>Your game results (level, time, hints) are shared anonymously with the site owner.</p>
+</main>
+
+<dialog id="dev">
+  <form id="gate" method="dialog">
+    <h2>Developer access</h2>
+    <p class="mut">Enter the dev passcode to view game statistics.</p>
+    <input id="pw" type="password" autocomplete="off" aria-label="Passcode">
+    <button class="primary" type="submit">Unlock</button> <button type="button" id="x1">Close</button>
+    <p id="gerr" class="mut" style="color:var(--bad)"></p>
+  </form>
+  <div id="stats" hidden>
+    <h2>Game statistics</h2>
+    <p class="mut" id="scopenote"></p>
+    <div id="scope" hidden><button id="scLocal">This browser</button> <button id="scAll">All players</button></div>
+    <div id="sbody"></div>
+    <details><summary>Raw data (JSON)</summary><textarea id="raw" rows="6" readonly></textarea></details>
+    <p><button id="reset">Reset stats</button> <button id="x2">Close</button></p>
+  </div>
+</dialog>
+
+<script>
+const $=s=>document.querySelector(s);
+const LV=[["Beginner",44],["Easy",38],["Medium",32],["Hard",28],["Expert",24]]; // name, target clue count
+const DEV_PASS="sudoku-dev"; // change this. It only hides the panel; it is not real security.
+const KEY="sudoku_stats_v1";
+const pc=m=>{let n=0;while(m){m&=m-1;n++}return n};
+const bx=i=>((i/27|0)*3)+((i%9)/3|0);
+const nm=i=>"R"+((i/9|0)+1)+"C"+(i%9+1);
+const pad2=n=>String(n).padStart(2,"0");
+const ft=s=>{s=Math.round(s);const h=s/3600|0,m=(s%3600)/60|0,x=s%60;return h?h+":"+pad2(m)+":"+pad2(x):m+":"+pad2(x)};
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- units & peers ---------- */
+const UNITS=[];
+for(let b=0;b<9;b++)UNITS.push(["Box "+(b+1),[...Array(81).keys()].filter(i=>bx(i)===b)]);
+for(let r=0;r<9;r++)UNITS.push(["Row "+(r+1),[...Array(9).keys()].map(c=>r*9+c)]);
+for(let c=0;c<9;c++)UNITS.push(["Column "+(c+1),[...Array(9).keys()].map(r=>r*9+c)]);
+const PEERS=[];
+for(let i=0;i<81;i++)PEERS[i]=[...Array(81).keys()].filter(j=>j!==i&&((j/9|0)===(i/9|0)||j%9===i%9||bx(j)===bx(i)));
+
+/* ---------- solver / generator ---------- */
+function solve(g,limit,rnd){
+  const R=Array(9).fill(0),C=Array(9).fill(0),B=Array(9).fill(0),b=g.slice(),out=[];
+  for(let i=0;i<81;i++)if(b[i]){const v=1<<b[i],r=i/9|0,c=i%9,k=bx(i);if(R[r]&v||C[c]&v||B[k]&v)return out;R[r]|=v;C[c]|=v;B[k]|=v}
+  (function rec(){
+    if(out.length>=limit)return;
+    let bi=-1,bm=0,bc=10;
+    for(let i=0;i<81;i++)if(!b[i]){const m=~(R[i/9|0]|C[i%9]|B[bx(i)])&0x3fe,k=pc(m);if(k<bc){bi=i;bm=m;bc=k;if(!k)return}}
+    if(bi<0){out.push(b.slice());return}
+    const r=bi/9|0,c=bi%9,k=bx(bi),ds=[];
+    for(let d=1;d<10;d++)if(bm&(1<<d))ds.push(d);
+    if(rnd)shuf(ds);
+    for(const d of ds){const v=1<<d;b[bi]=d;R[r]|=v;C[c]|=v;B[k]|=v;rec();b[bi]=0;R[r]&=~v;C[c]&=~v;B[k]&=~v;if(out.length>=limit)return}
+  })();
+  return out;
+}
+function generate(level){
+  const sol=solve(Array(81).fill(0),1,true)[0],p=sol.slice(),target=LV[level][1],t0=performance.now();
+  let clues=81;
+  for(const i of shuf([...Array(81).keys()])){
+    if(clues<=target||performance.now()-t0>3000)break;
+    const v=p[i];p[i]=0;
+    if(solve(p,2,false).length===1)clues--;else p[i]=v; // keep only removals that leave exactly one solution
+  }
+  return{p,sol};
+}
+
+/* ---------- stats storage ---------- */
+let games=(()=>{try{const a=JSON.parse(localStorage.getItem(KEY));return Array.isArray(a)?a:[]}catch(e){return[]}})();
+const saveStats=()=>{try{localStorage.setItem(KEY,JSON.stringify(games))}catch(e){}};
+
+/* ---------- shared stats (all players), when the host allows it ---------- */
+let db=null,uid=null,canWrite=false,owner=false,syncing=false,again=false;
+async function initShared(){
+  try{
+    if(typeof claude==="undefined")return;
+    const[d,u]=await Promise.all([claude.use("db"),claude.use("user")]);
+    if(!d||!u)return;
+    db=d;owner=await u.isOwner();uid=await u.id();
+    canWrite=!!uid&&(await u.can("data.write"))!==false;
+    if(canWrite){$("#share-note").hidden=false;shareGames()}
+  }catch(e){}
+}
+async function shareGames(){
+  if(!db||!canWrite)return;
+  if(syncing){again=true;return}
+  syncing=true;
+  try{
+    const ref=db.doc("players/"+uid),snap=await ref.get(),old=snap.exists?(snap.data().games||[]):[];
+    const seen=new Set(old.map(x=>x.started)),add=games.filter(x=>!seen.has(x.started));
+    if(add.length)await ref.set({games:old.concat(add).slice(-400),updated:new Date().toISOString()});
+  }catch(e){}
+  syncing=false;
+  if(again){again=false;shareGames()}
+}
+async function loadAll(){
+  const snap=await db.collection("players").get();
+  return{n:snap.size,games:snap.docs.flatMap(d=>(d.data().games||[]).map(x=>({...x,player:d.id}))).sort((a,b)=>String(a.started).localeCompare(String(b.started)))};
+}
+function openStats(){
+  renderStats();
+  $("#scope").hidden=!(owner&&db);
+  $("#scopenote").textContent=owner&&db?"Loading all players…":"Showing this browser only. Shared results from every player are visible to the site owner.";
+  if(owner&&db)$("#scAll").click();
+}
+$("#scLocal").onclick=()=>{renderStats();$("#scopenote").textContent="Showing this browser only."};
+$("#scAll").onclick=async()=>{
+  try{const a=await loadAll();renderStats(a.games,a.n);$("#scopenote").textContent="Showing every player who has shared results."}
+  catch(e){$("#scopenote").textContent="Couldn’t load shared results. Showing this browser only."}
+};
+
+/* ---------- game ---------- */
+let G=null;
+const el=()=>G?G.acc+(G.t0?(Date.now()-G.t0)/1000:0):0;
+const ok=()=>G&&!G.done;
+function msg(t,c){const m=$("#msg");m.textContent=t;m.className=c||""}
+function endGame(result){
+  if(!G||G.done)return;
+  const s=el();G.acc=s;G.t0=0;G.done=true;
+  if(result==="abandoned"&&s<20&&!G.hints)return; // a quick false start isn’t a game
+  games.push({started:G.started,ended:new Date().toISOString(),level:LV[G.lv][0],result,seconds:+s.toFixed(1),clues:G.p.filter(Boolean).length,hints:G.hints,checks:G.checks,errChecks:G.errs,tech:G.tech});
+  saveStats();shareGames();
+}
+function newGame(){
+  endGame("abandoned");
+  const lv=+$("#lv").value;
+  msg("Building a "+LV[lv][0]+" puzzle…");
+  setTimeout(()=>{
+    const{p,sol}=generate(lv);
+    G={lv,p,sol,cur:p.slice(),sel:-1,hc:-1,bad:new Set(),hints:0,checks:0,errs:0,tech:{},acc:0,t0:Date.now(),started:new Date().toISOString(),done:false};
+    render();
+    msg(p.filter(Boolean).length+" clues. Pick a cell, then type a number.");
+  },30);
+}
+function select(i){if(!G)return;G.sel=i;render()}
+function put(v){
+  if(!ok()||G.sel<0||G.p[G.sel])return;
+  G.cur[G.sel]=v;G.bad.clear();G.hc=-1;render();
+  if(G.cur.every((x,i)=>x===G.sol[i])){
+    endGame("solved");
+    const prev=games.slice(0,-1).filter(x=>x.result==="solved"&&x.level===LV[G.lv][0]&&(G.hints?true:!x.hints)).map(x=>x.seconds);
+    const rec=prev.length&&G.acc>=Math.min(...prev)?"":" New personal best for this level.";
+    msg("Solved in "+ft(G.acc)+(G.hints?" with "+G.hints+" hint"+(G.hints>1?"s":""):" with no hints")+"."+rec,"ok");
+  }
+}
+const wrong=()=>G.cur.map((v,i)=>v&&v!==G.sol[i]?i:-1).filter(i=>i>=0);
+function clash(i){
+  const v=G.cur[i];
+  for(const j of PEERS[i])if(G.cur[j]===v)return[j,(j/9|0)===(i/9|0)?"row":j%9===i%9?"column":"box"];
+}
+function check(){
+  if(!ok())return;
+  G.checks++;const w=wrong();G.bad=new Set(w);
+  if(w.length){
+    G.errs++;
+    let t=w.length+(w.length>1?" cells are":" cell is")+" wrong (red).";
+    const c=clash(w[0]);
+    if(c)t+=" "+nm(w[0])+" = "+G.cur[w[0]]+" clashes with "+nm(c[0])+" in the same "+c[1]+".";
+    msg(t,"err");
+  }else msg("No mistakes so far. "+G.cur.filter(v=>!v).length+" cells to go.","ok");
+  render();
+}
+function cands(i){let m=0x3fe;for(const j of PEERS[i])if(G.cur[j])m&=~(1<<G.cur[j]);const a=[];for(let d=1;d<10;d++)if(m&(1<<d))a.push(d);return a}
+function hint(){
+  if(!ok())return;
+  const w=wrong();
+  if(w.length){G.bad=new Set(w);render();return msg("Fix the red cells first, then ask for a hint.","err")}
+  let h=null;
+  for(let i=0;i<81&&!h;i++)if(!G.cur[i]){const c=cands(i);if(c.length===1)h={i,t:"Naked single",why:nm(i)+" can only be "+c[0]+": every other number is already in its row, column or box."}}
+  for(let u=0;u<UNITS.length&&!h;u++){
+    const[name,cells]=UNITS[u],emp=cells.filter(i=>!G.cur[i]);
+    for(let d=1;d<10&&!h;d++){
+      if(cells.some(i=>G.cur[i]===d))continue;
+      const f=emp.filter(i=>cands(i).includes(d));
+      if(f.length===1)h={i:f[0],t:"Hidden single",why:d+" can only go in "+nm(f[0])+" within "+name+"; no other cell there can take it."};
+    }
+  }
+  if(!h){const i=G.sel>=0&&!G.cur[G.sel]?G.sel:G.cur.findIndex(v=>!v);h={i,t:"Needs deeper logic",why:"No single-move shortcut here. The answer for "+nm(i)+" is "+G.sol[i]+"."}}
+  G.hints++;G.tech[h.t]=(G.tech[h.t]||0)+1;
+  G.cur[h.i]=G.sol[h.i];G.sel=h.i;G.hc=h.i;G.bad.clear();render();
+  msg(h.t+": "+h.why);
+  if(G.cur.every((x,i)=>x===G.sol[i])){endGame("solved");msg("Solved in "+ft(G.acc)+" with "+G.hints+" hint"+(G.hints>1?"s":"")+".","ok")}
+}
+function giveUp(){
+  if(!ok())return;
+  endGame("gave_up");G.cur=G.sol.slice();G.bad.clear();render();
+  msg("Solution shown. This game is recorded as given up.");
+}
+
+/* ---------- UI ---------- */
+const board=$("#board"),cells=[];
+for(let i=0;i<81;i++){const b=document.createElement("button");b.className="cell";b.onclick=()=>select(i);board.append(b);cells.push(b)}
+LV.forEach((l,i)=>$("#lv").append(new Option((i+1)+" · "+l[0],i)));
+$("#lv").value=1;
+const pad=$("#pad");
+for(let d=1;d<=9;d++){const b=document.createElement("button");b.textContent=d;b.onclick=()=>put(d);pad.append(b)}
+{const b=document.createElement("button");b.textContent="✕";b.setAttribute("aria-label","Erase");b.onclick=()=>put(0);pad.append(b)}
+function render(){
+  const s=G.sel,sv=s>=0?G.cur[s]:0;
+  cells.forEach((e,i)=>{
+    const v=G.cur[i];e.textContent=v||"";
+    let c="cell";
+    if(G.p[i])c+=" g";
+    if(s>=0&&i!==s&&PEERS[s].includes(i))c+=" peer";
+    if(sv&&v===sv&&i!==s)c+=" same";
+    if(i===s)c+=" sel";
+    if(G.bad.has(i))c+=" bad";
+    if(i===G.hc)c+=" hint";
+    e.className=c;
+    e.setAttribute("aria-label",nm(i)+(v?", "+v:", empty")+(G.p[i]?", clue":""));
+  });
+}
+$("#new").onclick=newGame;$("#hint").onclick=hint;$("#check").onclick=check;$("#giveup").onclick=giveUp;
+setInterval(()=>{$("#time").textContent=G?ft(el()):"0:00"},500);
+document.addEventListener("visibilitychange",()=>{
+  if(!ok())return;
+  if(document.hidden){G.acc+=(Date.now()-G.t0)/1000;G.t0=0}else if(!G.t0)G.t0=Date.now();
+});
+addEventListener("pagehide",()=>endGame("abandoned"));
+addEventListener("keydown",e=>{
+  if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==="d"){e.preventDefault();return openDev()}
+  if($("#dev").open||!G)return;
+  if(/^[1-9]$/.test(e.key))put(+e.key);
+  else if(["Backspace","Delete","0"].includes(e.key))put(0);
+  else{
+    const d={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];
+    if(!d)return;
+    e.preventDefault();
+    const from=G.sel<0?40:G.sel,to=from+d;
+    if(to>=0&&to<81&&(Math.abs(d)===9||(to/9|0)===(from/9|0)))select(to);
+  }
+});
+
+/* ---------- dev-only stats panel ---------- */
+const dlg=$("#dev");
+let taps=[];
+$("#logo").onclick=()=>{const t=Date.now();taps=taps.filter(x=>t-x<2000);taps.push(t);if(taps.length>=5){taps=[];openDev()}};
+function openDev(){
+  $("#gate").hidden=false;$("#stats").hidden=true;$("#pw").value="";$("#gerr").textContent="";
+  if(!dlg.open)dlg.showModal();
+  $("#pw").focus();
+}
+$("#gate").onsubmit=e=>{
+  e.preventDefault();
+  if($("#pw").value===DEV_PASS){$("#gate").hidden=true;$("#stats").hidden=false;openStats()}
+  else $("#gerr").textContent="Wrong passcode.";
+};
+$("#x1").onclick=$("#x2").onclick=()=>dlg.close();
+let armed=false;
+$("#reset").onclick=e=>{
+  if(!armed){armed=true;e.target.textContent="Click again to delete all";return}
+  armed=false;e.target.textContent="Reset stats";games=[];saveStats();renderStats();
+};
+function renderStats(g=games,np){
+  const sv=g.filter(x=>x.result==="solved");
+  const nums=a=>a.map(x=>x.seconds).filter(x=>typeof x==="number").sort((p,q)=>p-q);
+  const T=nums(sv),U=nums(sv.filter(x=>!x.hints));
+  let st=0,bs=0;g.forEach(x=>{if(x.result==="solved"){st++;bs=Math.max(bs,st)}else st=0});
+  const best=a=>a.length?ft(a[0]):"–",avg=a=>a.length?ft(a.reduce((p,q)=>p+q,0)/a.length):"–";
+  const med=a=>a.length?ft(a.length%2?a[a.length>>1]:(a[a.length/2-1]+a[a.length/2])/2):"–";
+  const sum=k=>g.reduce((p,x)=>p+(x[k]||0),0);
+  const tech={};g.forEach(x=>Object.entries(x.tech||{}).forEach(([k,v])=>tech[k]=(tech[k]||0)+v));
+  const kv=(b,s)=>`<div><b>${b}</b><span>${s}</span></div>`;
+  const rows=LV.map(([n])=>{
+    const a=g.filter(x=>x.level===n),s=a.filter(x=>x.result==="solved"),t=nums(s);
+    return`<tr><td>${n}</td><td>${a.length}</td><td>${s.length}</td><td>${best(t)}</td><td>${avg(t)}</td><td>${a.length?(a.reduce((p,x)=>p+(x.hints||0),0)/a.length).toFixed(1):"–"}</td></tr>`;
+  }).join("");
+  const recent=g.slice(-15).reverse().map(x=>`<tr><td>${esc(String(x.started||"").slice(0,16).replace("T"," "))}</td><td>${esc(x.level||"")}</td><td>${typeof x.seconds==="number"?ft(x.seconds):"–"}</td><td>${x.hints||0}</td><td>${x.checks||0}</td><td>${esc(x.result||"")}</td></tr>`).join("");
+  $("#sbody").innerHTML=g.length?`
+    <div class="kv">${np!=null?kv(np,"players"):""}${kv(g.length,"games")}${kv(sv.length,"solved")}${kv(Math.round(100*sv.length/g.length)+"%","completion")}${kv(st+" / "+bs,"streak now / best")}</div>
+    <div class="kv">${kv(best(T),"best time")}${kv(avg(T),"average")}${kv(med(T),"median")}${kv(U.length,"no-hint solves")}</div>
+    <p class="mut">Hints ${sum("hints")} · checks ${sum("checks")} (${sum("errChecks")} found a mistake) · techniques: ${Object.entries(tech).map(([k,v])=>esc(k)+" ×"+v).join(", ")||"none yet"}</p>
+    <div class="tw"><table><tr><th>Level</th><th>Played</th><th>Solved</th><th>Best</th><th>Avg</th><th>Hints/game</th></tr>${rows}</table></div>
+    <div class="tw"><table><tr><th>Started</th><th>Level</th><th>Time</th><th>Hints</th><th>Checks</th><th>Result</th></tr>${recent}</table></div>`
+    :`<p>No games recorded yet. Play one and come back.</p>`;
+  $("#raw").value=JSON.stringify(g);
+}
+
+initShared();
+newGame();
+</script>
+</body>
+</html>
